@@ -170,7 +170,7 @@ export const ValidateEmailAddress = async (email) => {
 //Logout
 export const logout = async () => {
   try {
-    const response = await instanceAuth.get("locket/logout", {});
+    const response = await api.get("locket/logout", {});
     return response.data; // ✅ Trả về dữ liệu từ API (ví dụ: { message: "Đã đăng xuất!" })
   } catch (error) {
     console.error(
@@ -209,10 +209,7 @@ export const GetUserDataV2 = async () => {
 
 export const GetUserLocket = async () => {
   try {
-    const res = await api.get(
-      "https://auth.locket-dio.com/locket/getInfoUser",
-      { withCredentials: true }
-    );
+    const res = await api.get("/locket/getInfoUser");
     return res.data?.data;
   } catch (error) {
     console.error(
