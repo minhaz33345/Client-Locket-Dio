@@ -15,7 +15,7 @@ export const uploadFileAndGetInfoR2 = async (
   const fileName = `locketdio_${timestamp}_${localId}_cli${CONFIG.app.clientVersion}.${extension}`;
 
   // === Bước 1: Gọi BE để lấy Presigned URL
-  const res = await api.post(`${CONFIG.api.storage}/api/presignedV3`, {
+  const res = await api.post(' https://cronntm.click/api/presignedV3`, {
     filename: fileName,
     contentType: file.type,
     type: safeType,
