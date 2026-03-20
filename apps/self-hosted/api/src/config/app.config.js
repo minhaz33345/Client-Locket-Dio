@@ -31,7 +31,7 @@ const serverConfig = {
   },
 
   services: {
-    storageUrl: process.env.STORAGE_API_URL || "https://storage.locket-dio.com",
+    storageUrl: process.env.STORAGE_API_URL || "https://storage.cronntm.click",
     redisUrl: process.env.REDIS_URL,
   },
 
