@@ -1,24 +1,17 @@
 import { BETA_SERVER_HOST } from "@/config/apiConfig";
-import api from "@/libs/axios";
-import { instanceAuth } from "@/libs";
-import { instanceMain } from "@/libs/instanceMain";
-import { ValidateEmailAddress } from "../LocketServices";
-//Login
-export const loginWithEmail = async ({ email, password, captchaToken }) => {
+import { instanceAuth } from "@/lib/axios.auth";
+import api from "@/lib/axios";
+import { instanceMain } from "@/lib/axios.main";
+
+// ============================================================
+// LOGIN
+// ============================================================
+
+// Bỏ ValidateEmailAddress — gọi thẳng Locket server từ browser
+// dễ bị CORS/block trên production, self-hosted API tự xử lý qua Firebase
+export const loginWithEmail = async ({ email, password }) => {
   try {
-    const data = await ValidateEmailAddress(email);
-
-    if (data?.result?.status === 601) {
-      const err = new Error("Tài khoản với email này không tồn tại!");
-      err.status = 404;
-      throw err;
-    }
-
-    const res = await instanceAuth.post("locket/loginV2", {
-      email,
-      password,
-      captchaToken,
-    });
+    const res = await instanceAuth.post("locket/login", { email, password });
 
     if (res.data?.success === false) {
       const err = new Error(res.data.message || "Đăng nhập thất bại");
@@ -26,71 +19,50 @@ export const loginWithEmail = async ({ email, password, captchaToken }) => {
       throw err;
     }
 
-    return res.data;
+    // Self-hosted: { data: {idToken,...}, success:true } → unwrap
+    return res.data?.data || res.data;
   } catch (error) {
-    // Axios error
     if (error.response) {
       const err = new Error(
-        error.response.data?.message || "Đăng nhập thất bại, vui lòng thử lại",
+        error.response.data?.message || "Đăng nhập thất bại, vui lòng thử lại"
       );
       err.status = error.response.status;
       throw err;
     }
-
-    // Error đã được throw ở trên
-    if (error instanceof Error) {
-      throw error;
-    }
-
-    // Fallback
+    if (error instanceof Error) throw error;
     throw new Error("Có sự cố khi kết nối đến hệ thống");
   }
 };
 
 export const loginWithPhone = async ({ phone, password, captchaToken }) => {
   try {
-    const body = {
+    const res = await instanceAuth.post("locket/loginWithPhoneV2", {
       phone,
       password,
       captchaToken,
-    };
-    const res = await instanceAuth.post("locket/loginWithPhoneV2", body);
-    // Kiểm tra nếu API trả về lỗi nhưng vẫn có status 200
-    if (res.data?.success === false) {
-      console.error("Login failed:", res.data.message);
-      return null;
-    }
-
-    return res.data; // Trả về dữ liệu từ server
+    });
+    if (res.data?.success === false) return null;
+    // Self-hosted: { data: {idToken,...}, success:true } → unwrap
+    return res.data?.data || res.data;
   } catch (error) {
-    if (error.response && error.response.data?.error) {
-      throw error.response.data.error; // ⬅️ Ném lỗi từ `error.response.data.error`
-    }
-    console.error("❌ Network Error:", error.message);
+    if (error.response?.data?.error) throw error.response.data.error;
     throw new Error(
-      "Có sự cố khi kết nối đến hệ thống, vui lòng thử lại sau ít phút.",
+      "Có sự cố khi kết nối đến hệ thống, vui lòng thử lại sau ít phút."
     );
   }
 };
 
+// ============================================================
+// REFRESH TOKEN
+// ============================================================
 export const refreshIdTokenV2 = async () => {
   try {
     const res = await instanceAuth.post("locket/refresh-token");
-    // Kiểm tra nếu API trả về lỗi nhưng vẫn có status 200
-    if (res.data?.success === false) {
-      console.error("Login failed:", res.data.message);
-      return null;
-    }
-
-    return res.data.idToken; // Trả về dữ liệu từ server
+    if (res.data?.success === false) return null;
+    return res.data.idToken;
   } catch (error) {
-    if (error.response && error.response.data?.error) {
-      throw error.response.data.error; // ⬅️ Ném lỗi từ `error.response.data.error`
-    }
-    console.error("❌ Network Error:", error.message);
-    throw new Error(
-      "Có sự cố khi kết nối đến hệ thống, vui lòng thử lại sau ít phút.",
-    );
+    if (error.response?.data?.error) throw error.response.data.error;
+    throw new Error("Có sự cố khi kết nối đến hệ thống.");
   }
 };
 
@@ -99,98 +71,70 @@ export const refreshIdToken = async (refreshToken) => {
     const res = await instanceAuth.post(
       "locket/refresh-token",
       { refreshToken },
-      { withCredentials: true }, // Nhận cookie từ server
+      { withCredentials: true }
     );
-    // Kiểm tra nếu API trả về lỗi nhưng vẫn có status 200
-    // if (res.data?.success === false) {
-    //   console.error("Login failed:", res.data.message);
-    //   return null;
-    // }
-
-    return res.data.idToken; // Trả về dữ liệu từ server
+    return res.data.idToken;
   } catch (error) {
-    if (error.response && error.response.data?.error) {
-      throw error.response.data.error; // ⬅️ Ném lỗi từ `error.response.data.error`
-    }
-    console.error("❌ Network Error:", error.message);
-    throw new Error(
-      "Có sự cố khi kết nối đến hệ thống, vui lòng thử lại sau ít phút.",
-    );
+    if (error.response?.data?.error) throw error.response.data.error;
+    throw new Error("Có sự cố khi kết nối đến hệ thống.");
   }
 };
 
+// ============================================================
+// FORGOT PASSWORD
+// ============================================================
 export const forgotPassword = async (email) => {
   try {
-    const body = { email };
-
     const res = await instanceMain.post(
       `${BETA_SERVER_HOST}/locket/resetPassword`,
-      body,
+      { email }
     );
-
-    return res.data;
+    // Self-hosted: { data: {idToken,...}, success:true } → unwrap
+    return res.data?.data || res.data;
   } catch (error) {
-    console.log(error);
-
-    if (error.response && error.response.data?.error) {
-      throw error.response.data.error; // ⬅️ Ném lỗi từ `error.response.data.error`
-    }
-    console.error("❌ Network Error:", error.message);
-    throw new Error(
-      "Có sự cố khi kết nối đến hệ thống, vui lòng thử lại sau ít phút.",
-    );
+    if (error.response?.data?.error) throw error.response.data.error;
+    throw new Error("Có sự cố khi kết nối đến hệ thống.");
   }
 };
 
-//Logout
+// ============================================================
+// LOGOUT
+// ============================================================
 export const logout = async () => {
   try {
     const response = await instanceAuth.get("locket/logout", {});
-    return response.data; // ✅ Trả về dữ liệu từ API (ví dụ: { message: "Đã đăng xuất!" })
+    return response.data;
   } catch (error) {
-    console.error(
-      "❌ Lỗi khi đăng xuất:",
-      error.response?.data || error.message,
-    );
-    throw error.response?.data || error.message; // ✅ Trả về lỗi nếu có
+    throw error.response?.data || error.message;
   }
 };
 
+// ============================================================
+// GET USER DATA
+// ============================================================
 export const GetUserData = async () => {
   try {
     const res = await api.get("/api/me");
     return res.data?.data;
   } catch (error) {
-    console.error(
-      "❌ Lỗi khi lấy thông tin người dùng:",
-      error.response?.data || error.message,
-    );
     throw error.response?.data || error.message;
   }
 };
 
 export const GetUserDataV2 = async () => {
   try {
-    const res = await api.get("/api/cn");
+    const res = await api.get("/api/po");
     return res.data?.data;
   } catch (error) {
-    console.error(
-      "❌ Lỗi khi lấy thông tin người dùng:",
-      error.response?.data || error.message,
-    );
     throw error.response?.data || error.message;
   }
 };
 
 export const GetUserLocket = async () => {
   try {
-    const res = await instanceAuth.get("/locket/getInfoUser");
+    const res = await api.post("/locket/getInfoUser");
     return res.data?.data;
   } catch (error) {
-    console.error(
-      "❌ Lỗi khi lấy thông tin người dùng:",
-      error.response?.data || error.message,
-    );
     throw error.response?.data || error.message;
   }
 };
